@@ -297,6 +297,22 @@ Product License: Community Engine
 
 ## 3.1 安装kubeadm，kubelet，kubectl
 
+安装阿里镜像源
+
+```properties
+cat <<EOF > /etc/yum.repos.d/kubernetes.repo
+[kubernetes]
+name=Kubernetes
+baseurl=https://mirrors.aliyun.com/kubernetes/yum/repos/kubernetes-el7-x86_64
+enabled=1
+gpgcheck=1
+repo_gpgcheck=1
+gpgkey=https://mirrors.aliyun.com/kubernetes/yum/doc/yum-key.gpg https://mirrors.aliyun.com/kubernetes/yum/doc/rpm-package-key.gpg
+EOF
+```
+
+开始安装
+
 ```properties
 yum -y install kubelet kubeadm kubectl
 ```
