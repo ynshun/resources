@@ -126,29 +126,43 @@ Static hostname: kubernetes-slave2
       Architecture: x86-64
 ```
 
-## 2.2 软件资源
 
-### 2.2.1 Docker安装
+
+## 2.2  调整系统参数
+
+```properties
+echo 1 > /proc/sys/net/bridge/bridge-nf-call-iptables
+
+swapoff -a
+```
+
+
+
+
+
+## 2.3 软件资源
+
+### 2.3.1 Docker安装
 
 本人作者安装时使用Docker-ce 18.09.6
 
-#### 2.2.1.1 查看已安装版本
+#### 2.3.1.1 查看已安装版本
 
 如果新机器从未安装过可忽略
 
-```
+```properties
 yum list installed | grep docker
 ```
 
-#### 2.2.1.2 删除已安装的docker版本
+#### 2.3.1.2 删除已安装的docker版本
 
 如果新机器从未安装过可忽略
 
-``` 
-yum -y remove docker
+``` properties
+yum -y remove docker-*
 ```
 
-#### 2.2.1.3 安装国内阿里云镜像
+#### 2.3.1.3 安装国内阿里云镜像
 
 ```properties
 yum install -y yum-utils device-mapper-persistent-data lvm2
@@ -160,18 +174,16 @@ yum-config-manager --add-repo http://mirrors.aliyun.com/docker-ce/linux/centos/d
 
 
 
-#### 2.2.1.4 查看可用版本
+#### 2.3.1.4 查看可用版本
 
-```yum list docker-ce --showduplicates
+```properties
 yum list docker-ce --showduplicates
 ```
 
-**温馨提示：**这里也有一个坑，不是所有版本都能成功，所在在安装时可以先网上查一下Kubernetes验证过的Docker版本，选择支持的版本进行安装。
+#### 2.3.1.5 安装Docker
 
-#### 2.2.1.5 安装Docker
-
-```
-yum -y install docker-ce-18.09.0-3.el7
+```properties
+yum -y install docker-ce
 ```
 
 **温馨提示：**安装完成后查看一下当前安装的信息``` yum list installed | grep docker ```
@@ -181,8 +193,6 @@ containerd.io.x86_64                 1.2.10-3.2.el7                 @docker-ce-s
 docker-ce.x86_64                     3:18.09.0-3.el7                @docker-ce-stable
 docker-ce-cli.x86_64                 1:18.09.0-3.el7                @docker-ce-stable
 ```
-
-作者在安装的时候遇到虽然在安装时指定了docker-ce版本，结果发现```docker-ce-cli.x86_64 ```的版本为当时的最新版本，当时本人的操作是卸载掉```yum -y remove docker-ce-cli```，然后重新安装指定的版本```yum -y install docker-ce-cli-18.09.0-3.el7```
 
 
 
@@ -209,7 +219,7 @@ Server: Docker Engine - Community
   Experimental:     false
 ```
 
-#### 2.2.1.6 配置Docker加速器
+#### 2.3.1.6 配置Docker加速器
 
 对于使用 **systemd** 的系统，请在 `/etc/docker/daemon.json` 中写入如下内容（如果文件不存在请新建该文件）
 
@@ -386,7 +396,7 @@ scheduler: {}
 ```
 
 * 修改文件中```advertiseAddress``` 为Master的IP
-* 修改文件中```imageRepository```为 ```registry.aliyuncs.com/google_containers```（默认的google.com国内不能访问）
+* 修改文件中```imageRepository```为 ```registry.aliyuncs.com/google_containers```
 * 修改/新增文件中```podSubnet```为``` 192.168.0.0/16```（本文的网络使用Calico，默认配置）
 
 ### 3.2.3 查看和拉取镜像
@@ -397,14 +407,6 @@ kubeadm config images list --config kubeadm.yml
 
 # 拉取镜像
 kubeadm config images pull --config kubeadm.yml
-```
-
-### 3.2.3 调整系统参数
-
-```properties
-echo 1 > /proc/sys/net/bridge/bridge-nf-call-iptables
-
-swapoff -a
 ```
 
 ### 3.2.4 安装Kubernetes主节点
@@ -438,7 +440,7 @@ kubeadm join 10.10.10.129:6443 --token abcdef.0123456789abcdef \
 
 
 
-**kubeadm init 的执行过程**
+**kubeadm init 的执行过程**：
 
 - init：指定版本进行初始化操作
 - preflight：初始化前的检查和下载所需要的 Docker 镜像文件
@@ -617,6 +619,42 @@ kube-system   kube-scheduler-kubernetes-master            1/1     Running   0
 - Slave 中重置配置：`kubeadm reset`
 - Slave 重启计算机：`reboot`
 - Slave 重新加入集群：`kubeadm join`
+
+### 3.5.2 解决 Unable to update cni config
+
+Master在执行kubeadm-init 时可能会一直不成功，根据```journalctl -xefu kubelet```命令查看到如下错误
+
+```properties
+Unable to update cni config: No networks found in /etc/cni/net.d
+```
+
+可以通过如下方法来解决：
+
+```properties
+vim /usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf
+
+添加
+Environment="KUBELET_NETWORK_ARGS=--network-plugin=cni --cni-conf-dir=/etc/cni/ --cni-bin-dir=/opt/cni/bin"
+```
+
+
+
+### 3.5.3 解决Service NodePort不能互通
+
+如果Service运行起来后，遇到对Node能访问，但是集群中其他Node不能访问的情况，这是由于linux还有底层的iptables，所以在node上分别执行：
+
+```properties
+iptables -P INPUT ACCEPT
+iptables -P FORWARD ACCEPT
+iptables -F
+iptables -L -n
+```
+
+
+
+
+
+
 
 
 # 4 应用篇
